@@ -7,7 +7,6 @@
 " let g:JSHintHighlightErrorLine = 0
 " in your .vimrc
 "
-
 if exists("b:did_jshint_plugin")
   finish
 else
@@ -37,6 +36,10 @@ if !exists("g:JSHintHighlightErrorLine")
   let g:JSHintHighlightErrorLine = 1
 endif
 
+if !exists("g:JSHintDisabled")
+	let g:JSHintDisabled = 0;
+endif
+
 if !exists("*s:JSHintUpdate")
   function s:JSHintUpdate()
     silent call s:JSHint()
@@ -48,7 +51,7 @@ if !exists(":JSHintUpdate")
   command JSHintUpdate :call s:JSHintUpdate()
 endif
 if !exists(":JSHintToggle")
-  command JSHintToggle :let b:jshint_disabled = exists('b:jshint_disabled') ? b:jshint_disabled ? 0 : 1 : 1
+  command JSHintToggle :let g:JSHintDisabled = exists('g:JSHintDisabled') ? g:JSHintDisabled ? 0 : 1 : 1
 endif
 
 noremap <buffer><silent> dd dd:JSHintUpdate<CR>
@@ -64,30 +67,10 @@ if has('win32')
 endif
 let s:cmd = "cd " . s:plugin_path . " && node " . s:plugin_path . "runner.js"
 
-" FindRc() will try to find a .jshintrc up the current path string
-" If it cannot find one it will try looking in the home directory
-" finally it will return an empty list indicating jshint should use
-" the defaults.
-if !exists("*s:FindRc")
-  function s:FindRc(path)
-    let l:filename = '/.jshintrc'
-    let l:jshintrc_file = expand(a:path) . l:filename
-    if filereadable(l:jshintrc_file)
-      let s:jshintrc = [join(readfile(l:jshintrc_file), '')]
-    elseif len(a:path) > 1
-      call s:FindRc(fnamemodify(expand(a:path), ":h"))
-    else 
-      let s:jshintrc_file = expand('~') . l:filename
-      if filereadable(l:jshintrc_file)
-        let s:jshintrc = [join(readfile(l:jshintrc_file), '')]
-      else
-        let s:jshintrc = []
-      end
-    endif
-  endfun
-endif
-
-call s:FindRc(expand("%:p:h"))
+let s:jshintrc_file = expand('~/.jshintrc')
+if filereadable(s:jshintrc_file)
+  let s:cmd = s:cmd . " " . shellescape(s:jshintrc_file)
+end
 
 " WideMsg() prints [long] message up to (&columns-1) length
 " guaranteed without "Press Enter" prompt.
@@ -101,8 +84,9 @@ if !exists("*s:WideMsg")
   endfun
 endif
 
+
 function! s:JSHintClear()
-  if exists("b:jshint_disabled") && b:jshint_disabled == 1
+  if exists("g:JSHintDisabled") && g:JSHintDisabled == 1
     return
   endif
     
@@ -119,7 +103,7 @@ function! s:JSHintClear()
 endfunction
 
 function! s:JSHint()
-  if exists("b:jshint_disabled") && b:jshint_disabled == 1
+  if exists("g:JSHintDisabled") && g:JSHintDisabled == 1
     return
   endif
 
@@ -160,7 +144,7 @@ function! s:JSHint()
   let b:jshint_output = system(s:cmd, lines . "\n")
   if v:shell_error
     echoerr 'could not invoke JSHint!'
-    let b:jshint_disabled = 1
+    let g:JSHintDisabled = 1
   end
 
   for error in split(b:jshint_output, "\n")

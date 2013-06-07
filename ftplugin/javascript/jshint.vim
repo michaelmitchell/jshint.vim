@@ -37,7 +37,7 @@ if !exists("g:JSHintHighlightErrorLine")
 endif
 
 if !exists("g:JSHintDisabled")
-	let g:JSHintDisabled = 0;
+	let g:JSHintDisabled = 0
 endif
 
 if !exists("*s:JSHintUpdate")

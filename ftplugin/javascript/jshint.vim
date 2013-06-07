@@ -7,6 +7,7 @@
 " let g:JSHintHighlightErrorLine = 0
 " in your .vimrc
 "
+
 if exists("b:did_jshint_plugin")
   finish
 else

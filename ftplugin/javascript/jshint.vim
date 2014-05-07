@@ -1,3 +1,4 @@
+
 " Global Options
 "
 " Enable/Disable highlighting of errors in source.
@@ -14,22 +15,29 @@ endif
 
 let s:install_dir = expand('<sfile>:p:h')
 
-au BufLeave <buffer> call s:JSHintClear()
-au BufEnter <buffer> call s:JSHint()
+"au BufLeave <buffer> call s:JSHintClear()
 
-"au InsertLeave <buffer> call s:JSHint()
+" Find out when JSHint should update
+
+if !exists("g:JSHintUpdateWriteOnly")
+  let g:JSHintUpdateWriteOnly = 0
+endif
+
+if g:JSHintUpdateWriteOnly == 0
+  "au BufEnter <buffer> call s:JSHint()
+  "au InsertLeave <buffer> call s:JSHint()
+endif
+
 "au InsertEnter <buffer> call s:JSHint()
-
 au BufWritePost <buffer> call s:JSHint()
 
 " due to http://tech.groups.yahoo.com/group/vimdev/message/52115
-" if(!has("win32") || v:version>702)
+if(!has("win32") || v:version>702)
+  "au CursorHold <buffer> call s:JSHint()
+  "au CursorHoldI <buffer> call s:JSHint()
 
-"au CursorHold <buffer> call s:JSHint()
-"au CursorHoldI <buffer> call s:JSHint()
-"au CursorHold <buffer> call s:GetJSHintMessage()
-
-"endif
+  au CursorHold <buffer> call s:GetJSHintMessage()
+endif
 
 au CursorMoved <buffer> call s:GetJSHintMessage()
 
@@ -44,34 +52,11 @@ if !exists("*s:JSHintUpdate")
   endfunction
 endif
 
-if !exists("*s:JSHintEnable")
-  function s:JSHintEnable()
-    let b:jshint_disabled = 0
-    silent call s:JSHintUpdate()
-  endfunction
-endif
-
-if !exists("*s:JSHintDisable")
-  function s:JSHintDisable()
-    silent call s:JSHintClear()
-    let b:jshint_disabled = 1
-  endfunction
-endif
-
 if !exists(":JSHintUpdate")
   command JSHintUpdate :call s:JSHintUpdate()
 endif
-
-if !exists(":JSHintClear")
-  command JSHintClear :call s:JSHintClear()
-endif
-
-if !exists(":JSHintEnable")
-  command JSHintEnable :call s:JSHintEnable()
-endif
-
-if !exists(":JSHintDisable")
-  command JSHintDisable :call s:JSHintDisable()
+if !exists(":JSHintToggle")
+  command JSHintToggle :let b:jshint_disabled = exists('b:jshint_disabled') ? b:jshint_disabled ? 0 : 1 : 1
 endif
 
 "noremap <buffer><silent> dd dd:JSHintUpdate<CR>
@@ -85,12 +70,32 @@ let s:plugin_path = s:install_dir . "/jshint/"
 if has('win32')
   let s:plugin_path = substitute(s:plugin_path, '/', '\', 'g')
 endif
-let s:cmd = "cd " . s:plugin_path . " && node " . s:plugin_path . "runner.js"
+let s:cmd = "cd " . s:plugin_path . " && ./runner.js"
 
-let s:jshintrc_file = expand('~/.jshintrc')
-if filereadable(s:jshintrc_file)
-  let s:cmd = s:cmd . " " . shellescape(s:jshintrc_file)
-end
+" FindRc() will try to find a .jshintrc up the current path string
+" If it cannot find one it will try looking in the home directory
+" finally it will return an empty list indicating jshint should use
+" the defaults.
+if !exists("*s:FindRc")
+  function s:FindRc(path)
+    let l:filename = '/.jshintrc'
+    let l:jshintrc_file = fnamemodify('.jshintrc', ':p')
+    if filereadable(l:jshintrc_file)
+      let s:jshintrc_file = l:jshintrc_file
+    elseif len(a:path) > 1
+      call s:FindRc(fnamemodify(a:path, ":h:h"))
+    else
+      let l:jshintrc_file = expand('~') . l:filename
+      if filereadable(l:jshintrc_file)
+        let s:jshintrc_file = l:jshintrc_file
+      else
+        let s:jshintrc_file = ''
+      end
+    endif
+  endfun
+endif
+
+call s:FindRc(expand("%:p:h"))
 
 " WideMsg() prints [long] message up to (&columns-1) length
 " guaranteed without "Press Enter" prompt.
@@ -104,12 +109,11 @@ if !exists("*s:WideMsg")
   endfun
 endif
 
-
 function! s:JSHintClear()
   if exists("b:jshint_disabled") && b:jshint_disabled == 1
     return
   endif
-    
+
   " Delete previous matches
   let s:matches = getmatches()
   for s:matchId in s:matches
@@ -161,9 +165,10 @@ function! s:JSHint()
     return
   endif
 
-  let b:jshint_output = system(s:cmd, lines . "\n")
+  let b:jshint_output = system(s:cmd . " " . s:jshintrc_file, lines . "\n")
   if v:shell_error
-    echoerr 'could not invoke JSHint!'
+    echoerr 'could not invoke JSHint: '
+    echom b:jshint_output
     let b:jshint_disabled = 1
   end
 
